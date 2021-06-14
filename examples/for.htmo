@@ -1,0 +1,4 @@
+<h1>{%v message %}</h1>
+{%f i in range(1, 11) do %}
+    <a href="">{%fv i %}</a>
+{% end %}

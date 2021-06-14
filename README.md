@@ -4,5 +4,5 @@ Template Engine for Python!
 Features:
 - Variables.
 - XSS Preventation.
-- For Loop (Soon).
+- For Loops (Not Finished).
 - If - Elif - Else (Soon).
