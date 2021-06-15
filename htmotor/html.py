@@ -18,8 +18,8 @@ class HTML:
 
     # Constants
     VAR_REGEX: str = r"(\\?{%v +([a-zA-Z0-9]+) *%})"
-    END_REGEX: str = r"(\\?{% *end *%}))"
-    FOR_REGEX: str = r"((\\?{%f +(.+ do) *%})(.+)" + END_REGEX
+    END_REGEX: str = r"(\\?{% *end *%})"
+    FOR_REGEX: str = r"(\\?{%f +(.+ do) *%})"
     FOR_VAR_REGEX: str = r"(\\?{%fv +([a-zA-Z0-9]+) *%})"
 
     def __init__(self, prevent_xss: bool = False) -> None:
@@ -74,9 +74,9 @@ class HTML:
 
     # Private Functions:
     def __minify(self, htmotor: str) -> str:
-        return "".join(
+        return "\n".join(
             i.strip() for i in htmotor.splitlines()
-        ).replace("\n", "")
+        )
 
     def __render_variables(self, htmotor: str, kwargs: dict) -> str:
         from re import findall
@@ -99,17 +99,28 @@ class HTML:
 
     def __render_for_loop(self, htmotor: str) -> str:
         from re import findall
+        index = 0
 
         for result in findall(self.FOR_REGEX, htmotor):
             # TODO: Fix Bugs.
+            full, loop = result
+            index = htmotor.find(full, index)
 
-            full_text, _, loop, content, _ = result
+            content = ""
+            full_text = full
+
+            for line in htmotor[index + len(full):].splitlines():
+                full_text += line + "\n"
+                if findall(self.END_REGEX, line):
+                    full_text = full_text[:-1]
+                    break
+                else:
+                    content += line
 
             content = self.__render_for_loop(content)
 
             for for_variable in findall(self.FOR_VAR_REGEX, content):
-                content = content.replace(
-                    for_variable[0], "{{{0}}}".format(for_variable[1]))
+                content = content.replace(for_variable[0], "{{{0}}}".format(for_variable[1]))
 
             exec_local = {}
 
@@ -119,7 +130,6 @@ class HTML:
             )
             exec(evaled_text, exec_local)
             result = exec_local["temp_for_func"]()
-
             htmotor = htmotor.replace(full_text, "".join(result))
 
         return htmotor
