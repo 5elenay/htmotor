@@ -39,7 +39,7 @@ class HTML:
         """
 
         return "".join(
-            f"&#{ord(i)};" for i in text
+            f"&#{ord(i)};" for i in str(text)
         )
 
     # Render & Render File Functions:
@@ -102,7 +102,6 @@ class HTML:
         index = 0
 
         for result in findall(self.FOR_REGEX, htmotor):
-            # TODO: Fix Bugs.
             full, loop = result
             index = htmotor.find(full, index)
 
@@ -120,9 +119,13 @@ class HTML:
             content = self.__render_for_loop(content)
 
             for for_variable in findall(self.FOR_VAR_REGEX, content):
-                content = content.replace(for_variable[0], "{{{0}}}".format(for_variable[1]))
+                content = content.replace(for_variable[0], "{{{0}}}".format(
+                    for_variable[1] if not self.xss else f"encode_string({for_variable[1]})"
+                ))
 
-            exec_local = {}
+            exec_local = {
+                "encode_string": self.prevent_xss
+            }
 
             evaled_text = "def temp_for_func():\n array = []\n for {0}:\n  array.append(f'{1}')\n\n return array".format(
                 loop.strip().rstrip("do"),
@@ -130,6 +133,7 @@ class HTML:
             )
             exec(evaled_text, exec_local)
             result = exec_local["temp_for_func"]()
+
             htmotor = htmotor.replace(full_text, "".join(result))
 
         return htmotor
