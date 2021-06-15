@@ -21,6 +21,7 @@ class HTML:
     END_REGEX: str = r"(\\?{% *end *%})"
     FOR_REGEX: str = r"(\\?{%f +(.+ do) *%})"
     FOR_VAR_REGEX: str = r"(\\?{%fv +([a-zA-Z0-9]+) *%})"
+    RESPONSIVE_REGEX: str = r"(\\?{% *responsive *%})"
 
     def __init__(self, prevent_xss: bool = False) -> None:
         self.xss = prevent_xss
@@ -54,7 +55,9 @@ class HTML:
             str: Rendered HTML string.
         """
 
-        minified = self.__minify(htmotor)
+        responsive = self.__render_responsive(htmotor)
+
+        minified = self.__minify(responsive)
         for_rendered = self.__render_for_loop(minified)
         return self.__render_variables(for_rendered, kwargs)
 
@@ -97,22 +100,42 @@ class HTML:
 
         return htmotor
 
+    def __render_responsive(self, htmotor: str) -> str:
+        from re import findall
+
+        for result in findall(self.RESPONSIVE_REGEX, htmotor):
+            htmotor = htmotor.replace(
+                result, "<meta charset=\"UTF-8\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">")
+
+        return htmotor
+
     def __render_for_loop(self, htmotor: str) -> str:
         from re import findall
         index = 0
 
         for result in findall(self.FOR_REGEX, htmotor):
             full, loop = result
+
+            if full.startswith("\\"):
+                continue
+
             index = htmotor.find(full, index)
 
             content = ""
             full_text = full
+            reference_count = 0
 
             for line in htmotor[index + len(full):].splitlines():
                 full_text += line + "\n"
-                if findall(self.END_REGEX, line):
+                if findall(self.FOR_REGEX, line):
+                    reference_count += 1
+                    continue
+                elif findall(self.END_REGEX, line) and reference_count == 0:
                     full_text = full_text[:-1]
                     break
+                elif findall(self.END_REGEX, line) and reference_count != 0:
+                    reference_count -= 1
+                    continue
                 else:
                     content += line
 
@@ -120,7 +143,8 @@ class HTML:
 
             for for_variable in findall(self.FOR_VAR_REGEX, content):
                 content = content.replace(for_variable[0], "{{{0}}}".format(
-                    for_variable[1] if not self.xss else f"encode_string({for_variable[1]})"
+                    for_variable[1] if not self.xss else "encode_string({0})".format(
+                        for_variable[1])
                 ))
 
             exec_local = {
@@ -131,6 +155,7 @@ class HTML:
                 loop.strip().rstrip("do"),
                 content.replace("\"", "\\\"").replace("'", "\\'")
             )
+
             exec(evaled_text, exec_local)
             result = exec_local["temp_for_func"]()
 
