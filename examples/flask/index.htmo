@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        {% responsive %}
+        <title>{%v title %}</title>
+</head>
+<body>
+        <h1>{%v name %}</h1>
+        {%ex import datetime %}
+        <p>Datetime: {%ev datetime.datetime.utcnow().strftime("%d/%m/%Y, %H:%M:%S") %}</p>
+</body>
+</html>

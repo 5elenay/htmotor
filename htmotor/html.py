@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Union
 
 
 @dataclass
@@ -22,6 +21,8 @@ class HTML:
     FOR_REGEX: str = r"(\\?{%f +(.+ do) *%})"
     FOR_VAR_REGEX: str = r"(\\?{%fv +([a-zA-Z0-9]+) *%})"
     RESPONSIVE_REGEX: str = r"(\\?{% *responsive *%})"
+    EVAL_REGEX: str = r"(\\?{%ev +(.+) *%})"
+    EXEC_REGEX: str = r"(\\?{%ex +(.+) *%})"
 
     def __init__(self, prevent_xss: bool = False) -> None:
         self.xss = prevent_xss
@@ -55,11 +56,13 @@ class HTML:
             str: Rendered HTML string.
         """
 
-        responsive = self.__render_responsive(htmotor)
-
-        minified = self.__minify(responsive)
-        for_rendered = self.__render_for_loop(minified)
-        return self.__render_variables(for_rendered, kwargs)
+        minified = self.__minify(htmotor)
+        variables = self.__render_variables(minified, kwargs)
+        responsive = self.__render_responsive(variables)
+        executed = self.__render_exec(responsive)
+        evaled = self.__render_eval(executed)
+        for_rendered = self.__render_for_loop(evaled, kwargs)
+        return for_rendered
 
     def render_file(self, path_like: str, **kwargs) -> str:
         """Render htmotor syntax to HTML (from file.).
@@ -109,7 +112,37 @@ class HTML:
 
         return htmotor
 
-    def __render_for_loop(self, htmotor: str) -> str:
+    def __render_exec(self, htmotor: str) -> str:
+        from re import findall
+
+        for result in findall(self.EXEC_REGEX, htmotor):
+            match, code = result
+
+            if match.startswith("\\"):
+                htmotor = htmotor.replace(match, match[1:])
+                continue
+
+            result = exec(code, globals())
+            htmotor = htmotor.replace(match, "")
+
+        return htmotor
+
+    def __render_eval(self, htmotor: str) -> str:
+        from re import findall
+
+        for result in findall(self.EVAL_REGEX, htmotor):
+            match, code = result
+
+            if match.startswith("\\"):
+                htmotor = htmotor.replace(match, match[1:])
+                continue
+
+            result = eval(code)
+            htmotor = htmotor.replace(match, self.prevent_xss(result))
+
+        return htmotor
+
+    def __render_for_loop(self, htmotor: str, kwargs: dict) -> str:
         from re import findall
         index = 0
 
@@ -117,29 +150,26 @@ class HTML:
             full, loop = result
 
             if full.startswith("\\"):
+                htmotor = htmotor.replace(full, full[1:])
                 continue
 
             index = htmotor.find(full, index)
 
             content = ""
             full_text = full
-            reference_count = 0
 
             for line in htmotor[index + len(full):].splitlines():
                 full_text += line + "\n"
                 if findall(self.FOR_REGEX, line):
-                    reference_count += 1
-                    continue
-                elif findall(self.END_REGEX, line) and reference_count == 0:
+                    raise SyntaxError(
+                        "You can't use for loop inside a for loop.")
+                elif findall(self.END_REGEX, line):
                     full_text = full_text[:-1]
                     break
-                elif findall(self.END_REGEX, line) and reference_count != 0:
-                    reference_count -= 1
-                    continue
                 else:
                     content += line
 
-            content = self.__render_for_loop(content)
+            content = self.__render_for_loop(content, kwargs)
 
             for for_variable in findall(self.FOR_VAR_REGEX, content):
                 content = content.replace(for_variable[0], "{{{0}}}".format(
@@ -148,7 +178,8 @@ class HTML:
                 ))
 
             exec_local = {
-                "encode_string": self.prevent_xss
+                "encode_string": self.prevent_xss,
+                **kwargs
             }
 
             evaled_text = "def temp_for_func():\n array = []\n for {0}:\n  array.append(f'{1}')\n\n return array".format(

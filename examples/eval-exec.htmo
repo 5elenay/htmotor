@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        {% responsive %}
+        <title>{%v message %}</title>
+</head>
+<body>
+        {%ex import datetime %}
+        <a href="">{%ev datetime.datetime.utcnow() %}</a>
+</body>
+</html>
