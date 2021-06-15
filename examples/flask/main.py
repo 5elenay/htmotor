@@ -8,7 +8,7 @@ motor = HTML(prevent_xss=True)
 
 @app.route('/')
 def index():
-    return motor.render_file("./test.html", title="Simple App", name="DateTime")
+    return motor.render_file("./test.htmo", title="Simple App", name="DateTime")
 
 if __name__ == '__main__':
     app.run()
