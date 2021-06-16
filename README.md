@@ -1,6 +1,11 @@
 # Htmotor
 HTML Template Engine for Python!
 
+[![Version](https://badge.fury.io/py/htmotor.svg)](https://pypi.python.org/pypi/htmotor)
+[![Downloads](https://img.shields.io/pypi/dm/htmotor.svg)](https://pypi.python.org/pypi/htmotor)
+![Stars](https://img.shields.io/github/stars/5elenay/htmotor)
+![Commits](https://img.shields.io/github/commit-activity/w/5elenay/htmotor)
+
 ## Installation:
 Open your terminal and type `pip install htmotor`. Now you are ready to go!
 
